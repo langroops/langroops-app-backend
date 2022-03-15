@@ -43,7 +43,7 @@ cloudinary.config({
 });
 
 
-app.get("/", (req, res) => {
+app.get("/*", (req, res) => {
     console.log("ping?")
     // res.send("Hello World");
     res.sendFile(path.resolve(__dirname, 'build', 'index.html'));
