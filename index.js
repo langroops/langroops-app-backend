@@ -43,11 +43,7 @@ cloudinary.config({
 });
 
 
-app.get("/*", (req, res) => {
-    console.log("ping?")
-    // res.send("Hello World");
-    res.sendFile(path.resolve(__dirname, 'build', 'index.html'));
-  });
+
 
 // --------------------- REGISTER PAGE SERVER ------------------------------
 
@@ -722,6 +718,12 @@ app.post("/groups/fetch", (req, res) => {
         })
 })
 
+app.get("/*", (req, res) => {
+    console.log("ping?")
+    // res.send("Hello World");
+    res.sendFile(path.resolve(__dirname, 'build', 'index.html'));
+  });
+
 let port = process.env.PORT;
 if (port == null || port == "") {
   port = 3001;
@@ -735,16 +737,7 @@ console.log("listening on port " + port)
 }
 })
 
-const http = require('http');
-const { Server } = require("socket.io");
 
-const httpServer = http.createServer(app);
-const io = new Server(httpServer, {
-    cors: {
-      origin: "http://localhost:3000",
-      methods: ["GET", "POST"]
-    }
-  });
 
 // app.get('/', (req, res) => {
 //   res.send("Hello World");
