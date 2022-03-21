@@ -9,6 +9,7 @@ content: String,
 image: String,
 audio: String,
 status: String, //"deleted" , "edited"
+read_by: Array,
 created_date: Date,
 updated_date: Date
 });

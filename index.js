@@ -20,13 +20,13 @@ const formidable = require("formidable");
 const uniqid = require("uniqid")
 
 //DOUBLE CHECK CORS BEFORE RELEASE - MAY NOT BE SECURE
-// const cors = require("cors");
+const cors = require("cors");
 
 
 require("dotenv").config();
 
 app.use(express.json());
-// app.use(cors({ credentials: true, origin: 'http://localhost:3000' }));
+app.use(cors({ credentials: true, origin: 'https://langroops.herokuapp.com' }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'build')));
 
@@ -53,7 +53,8 @@ app.post("/register", (req, res) => {
         password: req.body.values.password
     }
     console.log(accountInfo.email)
-    User.findOne({ email: accountInfo.email }, function (err, result) {
+    emailRegex = new RegExp('^' + accountInfo.email + '$', "i")
+    User.findOne({ email: { $regex: emailRegex } }, function (err, result) {
         if (result === null) {
             bcrypt.hash(accountInfo.password, 10).then((hash) => {
                 const newUser = new User({
@@ -82,7 +83,7 @@ app.post("/register", (req, res) => {
         }
         else {
             console.log("user exists")
-            res.send("error: user exists")
+            res.send("A user exists for this email address, try logging in")
         }
     }
     )
@@ -100,9 +101,11 @@ app.post("/login", async (req, res) => {
         password: req.body.values.password
     }
     console.log(accountInfo.email)
-    const user = await User.findOne({ email: accountInfo.email })
+    emailRegex = new RegExp('^' + accountInfo.email + '$', "i")
+    const user = await User.findOne({ email: { $regex: emailRegex } })
     if (!user) {
         console.log("User doesn't exist")
+        res.send("There is no user for this email, please register")
     }
     else {
         const dbpassword = user.password;
@@ -114,17 +117,16 @@ app.post("/login", async (req, res) => {
                 const accessToken = createToken(user);
                 console.log(accessToken);
                 res.cookie("access-token", accessToken, {
-                    maxAge: 30*24*60*60*100
+                    maxAge: 30 * 24 * 60 * 60 * 100
                 })
 
-                res.send({
-                    token: "test123"
-                })
+                res.send()
                 // Send JWT
             } else {
                 console.log()
                 // response is OutgoingMessage object that server response http request
                 console.log("Wrong Password")
+                res.send("Incorrect password, please try again")
             }
         });
 
@@ -141,45 +143,46 @@ app.get("/profile", validateToken, (req, res) => {
 app.post("/profile", validateToken, async (req, res) => {
     // console.log(req.accessToken.id)
     const member = await Member.findOne({ owner: req.accessToken.id })
-    .catch((err)=>{
-        console.log(err)
-    })
-        if (member) {
-            console.log("User already has member profile")
-            res.send("User already has member profile")
-        }
-        else {
-            const newMember = new Member({
-                first_name: req.body.firstName,
-                last_name: req.body.lastName,
-                profile_pic: req.body.profilePic,
-                native_language: req.body.nativeLanguage,
-                fluent_languages: req.body.fluentLanguages,
-                learning_languages: req.body.learningLanguages,
-                joined_groups: [],
-                admin_groups: [],
-                group_chats: [], // group channels
-                event_chats: [], // event channels
-                private_chats: [], // private channels
-                created_date: new Date(),
-                owner: req.accessToken.id
-            })
-            newMember.save().then(() => {
-                console.log("Member Registered")
-                res.send("Member Registered")
-                User.findOneAndUpdate({ _id: req.accessToken.id }, { role: "member" })
-                    .then(() => {
-                        console.log("User updated")
-                    })
-                    .catch((err) => {
-                        console.log(err)
-                    })
-            })
+        .catch((err) => {
+            console.log(err)
+        })
+    if (member) {
+        console.log("User already has member profile")
+        res.send("User already has member profile")
+    }
+    else {
+        const newMember = new Member({
+            first_name: req.body.firstName,
+            last_name: req.body.lastName,
+            profile_pic: req.body.profilePic,
+            country: req.body.country,
+            native_language: req.body.nativeLanguage,
+            fluent_languages: req.body.fluentLanguages,
+            learning_languages: req.body.learningLanguages,
+            joined_groups: [],
+            admin_groups: [],
+            group_chats: [], // group channels
+            event_chats: [], // event channels
+            private_chats: [], // private channels
+            created_date: new Date(),
+            owner: req.accessToken.id
+        })
+        newMember.save().then(() => {
+            console.log("Member Registered")
+            res.send("Member Registered")
+            User.findOneAndUpdate({ _id: req.accessToken.id }, { role: "member" })
+                .then(() => {
+                    console.log("User updated")
+                })
                 .catch((err) => {
                     console.log(err)
                 })
-            }
         })
+            .catch((err) => {
+                console.log(err)
+            })
+    }
+})
 
 
 
@@ -222,7 +225,9 @@ app.post("/create-group", validateToken, (req, res) => {
                 group_name: req.body.groupName,
                 group_type: req.body.groupType,
                 group_URL: Math.floor(Math.random() * 100000000),
-                group_pic: null,
+                group_pic: req.body.groupPic,
+                group_privacy: req.body.groupPrivacy,
+                group_languages: req.body.groupLanguages,
                 admin: member._id,
                 members: [member._id],
                 channel: "",
@@ -344,7 +349,22 @@ app.post("/book-event", validateToken, (req, res) => {
     )
 
 })
+// --------------------- MEMBER PAGES SERVER ------------------------------
 
+app.get("/members", (req, res) => {
+    Member.find({}, function (err, result) {
+        res.send(result)
+    })
+})
+
+app.get("/member/:memberURL", (req, res) => {
+    let memberURL = req.params.memberURL
+    console.log(memberURL)
+    Member.findOne({ member_URL: memberURL }, function (err, result) {
+        // console.log(result)
+        res.send(result)
+    })
+})
 
 // --------------------- GROUP PAGES SERVER ------------------------------
 
@@ -375,7 +395,7 @@ app.get("/group/:groupURL/join-group", validateToken, (req, res) => {
                 }
                 else {
                     Group.findOneAndUpdate({ group_URL: groupURL }, { $push: { members: memberId } }, function (err, group) {
-                        Member.findByIdAndUpdate(memberId, {$push: {joined_groups: group._id, group_chats: group.channel}}, function (err, result) {
+                        Member.findByIdAndUpdate(memberId, { $push: { joined_groups: group._id, group_chats: group.channel } }, function (err, result) {
                             res.send("Member Added Successfully")
                         })
                     })
@@ -489,27 +509,7 @@ app.get("/event/:eventURL/cancel-rsvp", validateToken, (req, res) => {
 
 
 
-
-
-
-
-app.post("/channels/members/fetch", (req, res) => {
-    // console.log(req.body)
-    const chatType = req.body.channel_type + "Chats";
-    const channelId = req.body.channel_id;
-    // console.log(chatType, channelId)
-    var ObjectId = require('mongoose').Types.ObjectId;
-    Member.find({ [chatType]: new ObjectId(channelId) }, function (err, members) {
-        if (err) {
-            console.log(err)
-        } else {
-            // console.log(members)
-            res.send(members)
-        }
-    })
-})
-
-
+//old - to be deleted
 app.post("/groups/:groupURL/chat", validateToken, (req, res) => {
     console.log(req.body)
     let groupURL = req.params.groupURL
@@ -544,6 +544,77 @@ app.post("/groups/:groupURL/chat", validateToken, (req, res) => {
 })
 
 
+
+//get group members profile
+app.post("/group/members/fetch", async (req, res) => {
+    const members = req.body;
+    console.log(members)
+    // if (members) { //changed this code to suit members page will need recoding for channels page
+    const filteredMembers = [];
+    for (let i = 0; i < members.length; i++) {
+        const filter = await Member.findOne({ _id: members[i] })
+        filteredMembers.push(filter);
+        // console.log(filteredMembers);
+    }
+    // console.log(filteredMembers)
+    res.send(filteredMembers);
+    // } else {
+    //     console.log("no filter")
+    //     Member.find({})
+    //         .sort({ created_date: -1 })
+    //         .limit(10)
+    //         .exec(function (err, results) {
+    //             res.send(results);
+    //         })
+
+    // }
+})
+
+//get event attendees profiles
+app.post("/event/attendees/fetch", async (req, res) => {
+    const attendees = req.body;
+    console.log(attendees)
+    const filteredMembers = [];
+    for (let i = 0; i < attendees.length; i++) {
+        const filter = await Member.findOne({ _id: attendees[i] })
+        filteredMembers.push(filter);
+        // console.log(filteredMembers);
+    }
+    // console.log(filteredMembers)
+    res.send(filteredMembers);
+})
+
+//get a single members (current user) profile
+app.get("/current-member/fetch", validateToken, async (req, res) => {
+    Member.findOne({ owner: req.accessToken.id }, function (err, member) {
+        if (err) {
+            console.log(err);
+        }
+        else {
+            res.send(member)
+        }
+    })
+})
+
+//update a single members (current user) profile
+app.post("/current-member/update", validateToken, (req, res) => {
+    const toUpdate = req.body
+    console.log(toUpdate)
+    Member.findOneAndUpdate({ owner: req.accessToken.id }, toUpdate, function (err, member) {
+        if (err) {
+            console.log(err);
+        }
+        else {
+            console.log(member)
+            res.send("The update to your profile has been saved");
+        }
+    })
+})
+
+
+//channels and chats
+
+
 app.post("/chats/post", validateToken, (req, res) => {
     Member.findOne({ owner: req.accessToken.id }, function (err, member) {
         if (member) {
@@ -570,56 +641,9 @@ app.post("/chats/post", validateToken, (req, res) => {
     })
 })
 
-
-//get group members profile
-app.post("/group/members/fetch", async (req, res) => {
-    const members = req.body;
-    console.log(members)
-    // if (members) { //changed this code to suit members page will need recoding for channels page
-        const filteredMembers = [];
-        for (let i = 0; i < members.length; i++) {
-            const filter = await Member.findOne({ _id: members[i] })
-            filteredMembers.push(filter);
-            // console.log(filteredMembers);
-        }
-        // console.log(filteredMembers)
-        res.send(filteredMembers);
-    // } else {
-    //     console.log("no filter")
-    //     Member.find({})
-    //         .sort({ created_date: -1 })
-    //         .limit(10)
-    //         .exec(function (err, results) {
-    //             res.send(results);
-    //         })
-
-    // }
-})
-
-//get event attendees profiles
-app.post("/event/attendees/fetch", async (req, res) => {
-    const attendees = req.body;
-    console.log(attendees)
-        const filteredMembers = [];
-        for (let i = 0; i < attendees.length; i++) {
-            const filter = await Member.findOne({ _id: attendees[i] })
-            filteredMembers.push(filter);
-            // console.log(filteredMembers);
-        }
-        // console.log(filteredMembers)
-        res.send(filteredMembers);
-})
-
-//get a single members profile
-app.get("/member/fetch", validateToken, async (req, res) => {
-    Member.findOne({ owner: req.accessToken.id }, function (err, member) {
-        res.send(member)
-    })
-})
-
 app.post("/chats/fetch", (req, res) => {
     // console.log(req.body)
-    const channelId = req.body.currentChannel;
+    const { channelId, memberId } = req.body;
     const filteredChats = [];
     // console.log(channelId)
     Chat.find({ channel_id: channelId }, function (err, chats) {
@@ -629,19 +653,25 @@ app.post("/chats/fetch", (req, res) => {
         else {
             // console.log(chats)
             res.send(chats)
+            chats.forEach((chat) => {
+                Chat.findByIdAndUpdate(chat._id, { $push: { read_by: memberId } })
+                    .catch((err) => {
+                        console.log(err)
+                    })
+            })
         }
     })
 })
 
-app.post("/chat/delete", (req,res)=>{
+app.post("/chat/delete", (req, res) => {
     console.log(req.body.chatId)
-    Chat.findByIdAndUpdate(req.body.chatId, {status: "deleted"})
-    .then((result)=>{
-        console.log("deleted")
-    })
-    .catch((err)=>{
-        console.log(err)
-    })
+    Chat.findByIdAndUpdate(req.body.chatId, { status: "deleted" })
+        .then((result) => {
+            console.log("deleted")
+        })
+        .catch((err) => {
+            console.log(err)
+        })
 })
 
 app.post("/channels/fetch", async (req, res) => {
@@ -661,18 +691,51 @@ app.post("/channels/fetch", async (req, res) => {
     }
 })
 
+app.post("/channels/members/fetch", (req, res) => {
+    // console.log(req.body)
+    const chatType = req.body.channel_type + "Chats";
+    const channelId = req.body.channel_id;
+    // console.log(chatType, channelId)
+    var ObjectId = require('mongoose').Types.ObjectId;
+    Member.find({ [chatType]: new ObjectId(channelId) }, function (err, members) {
+        if (err) {
+            console.log(err)
+        } else {
+            // console.log(members)
+            res.send(members)
+        }
+    })
+})
+
+app.post("/chats/check-read", (req, res) => {
+    const channels = req.body.channels;
+    const memberId = req.body.memberId
+    console.log(memberId, channels)
+    let allUnread = [];
+    channels.forEach((channel) => {
+        Chat.find({ channel_id: channel, read_by: { $nin: memberId } }, function (err, result) {
+            if (err) {
+                console.log(err)
+            }
+            else {
+                let unreadChats = {
+                    channel: channel,
+                    chats: result.length
+                }
+                allUnread.push(unreadChats)
+                if (allUnread.length === channels.length) {
+                    res.send(allUnread)
+                }
+            }
+        })
+    })
+})
+
 
 //get all members with filter
-//query = {
-// filters: [{field:, value:, type:}, ...] //pass as exact object of filters
-// (types: contains, eq, ne, gt, lt [])
-//>>>types 
-// limit: 
-// sort: ascending, descending //pass as an exact sort
-//}
 app.post("/members/fetch", (req, res) => {
     console.log(req.body)
-    const {filters, limit, sort} = req.body
+    const { filters, limit, sort } = req.body
 
     Member.find(filters)
         .limit(limit)
@@ -689,7 +752,7 @@ app.post("/members/fetch", (req, res) => {
 //get all events with filter
 app.post("/events/fetch", (req, res) => {
     console.log("ping")
-    const {filters, limit, sort} = req.body
+    const { filters, limit, sort } = req.body
     Event.find(filters)
         .limit(limit)
         .sort(sort)
@@ -722,19 +785,19 @@ app.get("/*", (req, res) => {
     console.log("ping?")
     // res.send("Hello World");
     res.sendFile(path.resolve(__dirname, 'build', 'index.html'));
-  });
+});
 
 let port = process.env.PORT;
 if (port == null || port == "") {
-  port = 3001;
+    port = 3001;
 }
-app.listen(port, function(err){
-if(err){
-    console.log(err)
-}
-else{
-console.log("listening on port " + port)
-}
+app.listen(port, function (err) {
+    if (err) {
+        console.log(err)
+    }
+    else {
+        console.log("listening on port " + port)
+    }
 })
 
 
