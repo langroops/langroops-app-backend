@@ -26,7 +26,7 @@ const cors = require("cors");
 require("dotenv").config();
 
 app.use(express.json());
-app.use(cors({ credentials: true, origin: 'https://langroops.herokuapp.com' }));
+app.use(cors({ credentials: true, origin: 'https://langroops.herokuapp.com' })); //https://langroops.herokuapp.com http://localhost:3000
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'build')));
 
@@ -70,11 +70,9 @@ app.post("/register", (req, res) => {
                     const accessToken = createToken(newUser);
                     console.log(accessToken);
                     res.cookie("access-token", accessToken, {
-                        maxAge: 30 * 24 * 60 * 60
+                        maxAge: 30 * 24 * 60 * 60 * 100
                     })
-                    res.send({
-                        token: "test123"
-                    })
+                    res.send()
                 })
                     .catch((err) => {
                         console.log(err)
@@ -105,7 +103,7 @@ app.post("/login", async (req, res) => {
     const user = await User.findOne({ email: { $regex: emailRegex } })
     if (!user) {
         console.log("User doesn't exist")
-        res.send("There is no user for this email, please register")
+        res.send({error: "There is no user for this email, please register"})
     }
     else {
         const dbpassword = user.password;
@@ -120,13 +118,13 @@ app.post("/login", async (req, res) => {
                     maxAge: 30 * 24 * 60 * 60 * 100
                 })
 
-                res.send()
+                res.send(user.role)
                 // Send JWT
             } else {
                 console.log()
                 // response is OutgoingMessage object that server response http request
                 console.log("Wrong Password")
-                res.send("Incorrect password, please try again")
+                res.send({error: "Incorrect password, please try again"})
             }
         });
 
@@ -154,6 +152,7 @@ app.post("/profile", validateToken, async (req, res) => {
         const newMember = new Member({
             first_name: req.body.firstName,
             last_name: req.body.lastName,
+            member_URL: Math.floor(Math.random() * 100000000),
             profile_pic: req.body.profilePic,
             country: req.body.country,
             native_language: req.body.nativeLanguage,
